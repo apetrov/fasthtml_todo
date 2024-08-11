@@ -105,6 +105,8 @@ class Routes:
         app.route("/todos/create", methods=['post'])(todo_controller.create)
 
 def create_app():
+    # doesn't work out of the box
+    # app = FastHTML()
     app, rt = fast_app()
     Db.init_app(app)
     Routes().init_app(app)
@@ -112,7 +114,7 @@ def create_app():
 
 def main():
     app = create_app()
-    uvicorn.run("main:create_app", reload=True)
+    uvicorn.run("main:create_app", reload=True, factory=True)
 
 if __name__ == '__main__':
     main()
