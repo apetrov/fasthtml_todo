@@ -1,3 +1,5 @@
+# TODO
+
 from fasthtml.common import *
 from sqlalchemy import create_engine, MetaData
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -58,6 +60,10 @@ class TodoRepo:
         self.db.commit()
 
 @dataclass
+class TodoForm:
+    title: str
+
+@dataclass
 class TodosController:
     db: object
 
@@ -91,8 +97,8 @@ class TodosController:
                     header=form
                 ))
 
-    def create(self, title: str):
-        todo = Todo(title=title, done=False)
+    def create(self, todo_form: TodoForm):
+        todo = Todo(title=todo_form.title, done=False)
         self.repo.save(todo)
         return render(todo), create_input()
 
