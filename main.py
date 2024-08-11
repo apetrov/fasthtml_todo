@@ -3,6 +3,10 @@ from sqlalchemy import create_engine, MetaData
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy import Column, Integer, String, Boolean
 
+from dataclasses import dataclass
+
+import uvicorn
+
 Base = declarative_base()
 metadata = MetaData()
 
@@ -19,7 +23,9 @@ class Db:
         app.db = sessionmaker(bind=engine)()
         return app
 
-import uvicorn
+
+def create_input():
+    return  Input(name='title', id='title', placeholder='Enter todo', hx_swap_oob='true')
 
 def render(todo):
     tid = f'todo-{todo.id}'
@@ -28,64 +34,57 @@ def render(todo):
     return Li(
             toggle,
             delete,
-            todo.title + (' (done)' if todo.done else ''),
+            str(todo.title) + (' (done)' if todo.done else ''),
             id=tid
             )
 
-def show(id:int):
-    todo = state.app.db.query(Todo).get(id)
-    todo.done = not todo.done
-    state.app.db.add(todo)
-    state.app.db.commit()
-    return render(todo)
+@dataclass
+class TodosController:
+    db: object
 
-def delete(id:int): todos.delete(id)
+    def show(self, id:int):
+        todo = self.db.query(Todo).get(id)
+        todo.done = not todo.done
+        self.db.add(todo)
+        self.db.commit()
+        return render(todo)
 
+    def destroy(self, id:int):
+        todo = self.db.query(Todo).get(id)
+        self.db.delete(todo)
+        self.db.commit()
 
-def create_input():
-    return  Input(name='title', id='title', placeholder='Enter todo', hx_swap_oob='true')
+    def index(self):
+        todos = self.db.query(Todo).all()
+        form = Form(
+                Group(
+                    create_input(),
+                    Button('Add')
+                    ),
+                hx_post='/todos/create',
+                target_id='todo-list',
+                hx_swap='beforeend',
+        )
 
+        return Titled("Todos",
+                Card(
+                    Ul( *[render(t) for t in todos], id='todo-list'),
+                    header=form
+                ))
 
-def index():
-    todos = state.app.db.query(Todo).all()
-    form = Form(
-            Group(
-                create_input(),
-                Button('Add')
-                ),
-            hx_post='/todos/create',
-            target_id='todo-list',
-            hx_swap='beforeend',
-    )
-
-    return Titled("Todos",
-            Card(
-                Ul( *[render(t) for t in todos], id='todo-list'),
-                header=form
-            ))
-
-
-def create(todo: Todo): 
-    state.app.db.add(todo)
-    state.app.db.commit()
-    return render(todo), create_input()
-
+    def create(self, title: str):
+        todo = Todo(title=title, done=False)
+        self.db.add(todo)
+        self.db.commit()
+        return render(todo), create_input()
 
 class Routes:
     def init_app(self, app):
-        app.route("/todos", methods=['get'])(index)
-        app.route("/todos/{id}", methods=['get'])(show)
-        #app.route("/todos/{id}", methods=['delete'])(delete)
-        app.route("/todos/create", methods=['post'])(create)
-
-from dataclasses import dataclass
-@dataclass
-class GlobalState:
-    app: object
-
-
-state = GlobalState(app=None)
-
+        todo_controller = TodosController(app.db)
+        app.route("/todos", methods=['get'])(todo_controller.index)
+        app.route("/todos/{id}", methods=['get'])(todo_controller.show)
+        app.route("/todos/{id}", methods=['delete'])(todo_controller.destroy)
+        app.route("/todos/create", methods=['post'])(todo_controller.create)
 
 def create_app():
     app, rt = fast_app()
@@ -95,7 +94,6 @@ def create_app():
     # app.db.add(Todo(title='Second todo', done=False))
     # app.db.add(Todo(title='Third todo', done=False))
     # app.db.commit()
-    state.app = app
     return app
 
 def main():
