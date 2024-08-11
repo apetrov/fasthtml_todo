@@ -8,7 +8,6 @@ from dataclasses import dataclass
 import uvicorn
 
 Base = declarative_base()
-metadata = MetaData()
 
 class Todo(Base):
     __tablename__ = 'users'
@@ -38,24 +37,44 @@ def render(todo):
             id=tid
             )
 
+
+@dataclass
+class TodoRepo:
+    db: object
+
+    def all(self):
+        return self.db.query(Todo).all()
+
+    def get(self, id:int):
+        return self.db.query(Todo).get(id)
+
+    def save(self, todo: Todo):
+        self.db.add(todo)
+        self.db.commit()
+
+    def destroy(self, id:int):
+        todo = self.get(id)
+        self.db.delete(todo)
+        self.db.commit()
+
 @dataclass
 class TodosController:
     db: object
 
+    def __post_init__(self):
+        self.repo = TodoRepo(self.db)
+
     def show(self, id:int):
-        todo = self.db.query(Todo).get(id)
+        todo = self.repo.get(id)
         todo.done = not todo.done
-        self.db.add(todo)
-        self.db.commit()
+        self.repo.save(todo)
         return render(todo)
 
     def destroy(self, id:int):
-        todo = self.db.query(Todo).get(id)
-        self.db.delete(todo)
-        self.db.commit()
+        self.repo.destroy(id)
 
     def index(self):
-        todos = self.db.query(Todo).all()
+        todos = self.repo.all()
         form = Form(
                 Group(
                     create_input(),
@@ -74,8 +93,7 @@ class TodosController:
 
     def create(self, title: str):
         todo = Todo(title=title, done=False)
-        self.db.add(todo)
-        self.db.commit()
+        self.repo.save(todo)
         return render(todo), create_input()
 
 class Routes:
@@ -90,10 +108,6 @@ def create_app():
     app, rt = fast_app()
     Db.init_app(app)
     Routes().init_app(app)
-    # app.db.add(Todo(title='First todo', done=False))
-    # app.db.add(Todo(title='Second todo', done=False))
-    # app.db.add(Todo(title='Third todo', done=False))
-    # app.db.commit()
     return app
 
 def main():
